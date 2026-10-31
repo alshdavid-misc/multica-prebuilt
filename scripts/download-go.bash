@@ -4,6 +4,8 @@ set -e
 REPO_DIR="$(git -C "$(dirname -- "${BASH_SOURCE[0]}")" rev-parse --show-toplevel)"
 echo $REPO_DIR
 
+rm -rf "$REPO_DIR/go"
+
 ARCH="$ARCH"
 if [ "$ARCH" = "" ]; then
   case "$(uname -m)" in

@@ -1,3 +1,5 @@
 go/
 node/
 node_modules/
+multica-build-workspace/
+.pnpm-store/

@@ -1,9 +1,11 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+REPO_DIR="$(git -C "$(dirname -- "${BASH_SOURCE[0]}")" rev-parse --show-toplevel)"
+
 # Configuration
 REPO="multica-ai/multica"
-WORK_DIR="./multica-build-workspace"
+WORK_DIR="${REPO_DIR}/multica-build-workspace"
 
 echo "==> Fetching the latest release tag from $REPO..."
 LATEST_TAG=$(curl -s "https://api.github.com/repos/$REPO/releases/latest" | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/')
