@@ -3,6 +3,12 @@ set -euxo pipefail
 
 REPO_DIR="$(git -C "$(dirname -- "${BASH_SOURCE[0]}")" rev-parse --show-toplevel)"
 
+# rm -rf "${REPO_DIR}/.pnpm-store"
+rm -rf "${REPO_DIR}/go"
+rm -rf "${REPO_DIR}/node"
+rm -rf "${REPO_DIR}/multica-build-workspace"
+rm -rf "${REPO_DIR}/dist"
+
 apt-get update
 apt-get install -y --no-install-recommends ca-certificates curl git libatomic1
 
@@ -23,8 +29,36 @@ go version
 which node
 node --version
 
-bash "${REPO_DIR}/scripts/build-multica.bash"
+LATEST_TAG="$(bash "${REPO_DIR}/scripts/resolve-multica-tag.bash")"
+LATEST_VERSION="${LATEST_TAG#v}"
 
-rm -rf "${REPO_DIR}/go"
-rm -rf "${REPO_DIR}/node"
-rm -rf "${REPO_DIR}/multica-build-workspace"
+# Resolve once so the source build and the CLI download use the same release
+export MULTICA_TAG="$(bash "${REPO_DIR}/scripts/resolve-multica-tag.bash")"
+
+bash "${REPO_DIR}/scripts/download-multica-cli.bash"
+bash "${REPO_DIR}/scripts/build-multica.bash"
+# node "${REPO_DIR}/scripts/resolve-linkts.mts" "${REPO_DIR}/multica-build-workspace/multica-${LATEST_VERSION}/apps/web/node_modules"
+
+bash "${REPO_DIR}/scripts/download-multica-cli.bash"
+
+mkdir -p "${REPO_DIR}/dist/bin"
+mkdir -p "${REPO_DIR}/dist/lib"
+mkdir -p "${REPO_DIR}/dist/lib/multica-web"
+mkdir -p "${REPO_DIR}/dist/share"
+
+echo "${LATEST_VERSION}"
+
+BUILD_DIR="${REPO_DIR}/multica-build-workspace/multica-${LATEST_VERSION}"
+
+# Same contents as /app in the backend and web images
+cp -a "${BUILD_DIR}/bin/multica-server" "${REPO_DIR}/dist/lib/multica-server"
+cp -a "${BUILD_DIR}/bin/multica-web" "${REPO_DIR}/dist/share/multica-web"
+cp "$(which node)" "${REPO_DIR}/dist/lib/multica-web"
+
+cp "${REPO_DIR}/bins/multica-server" "${REPO_DIR}/dist/bin/multica-server"
+cp "${REPO_DIR}/bins/multica-web" "${REPO_DIR}/dist/bin/multica-web"
+
+# rm -rf "${REPO_DIR}/go"
+# rm -rf "${REPO_DIR}/node"
+# rm -rf "${REPO_DIR}/.pnpm-store"
+# rm -rf "${REPO_DIR}/multica-build-workspace"

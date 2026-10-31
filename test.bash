@@ -1,9 +1,12 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-docker run \
+# Rootless podman maps container root to the current user, so files written
+# to the mount are owned by the invoking user on the host
+podman run \
   --rm \
   -it \
+  --userns=keep-id:uid=0,gid=0 \
   -v "${PWD}:${PWD}:Z" \
   -w "${PWD}" \
   debian:13 \

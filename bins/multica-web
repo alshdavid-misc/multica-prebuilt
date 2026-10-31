@@ -1,0 +1,23 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Resolve symlinks so this works when linked into another bin directory
+SOURCE="${BASH_SOURCE[0]}"
+while [ -L "$SOURCE" ]; do
+  DIR="$(cd -P -- "$(dirname -- "$SOURCE")" && pwd)"
+  SOURCE="$(readlink -- "$SOURCE")"
+  [[ "$SOURCE" != /* ]] && SOURCE="$DIR/$SOURCE"
+done
+SCRIPT_DIR="$(cd -P -- "$(dirname -- "$SOURCE")" && pwd)"
+PREFIX_DIR="$(dirname -- "$SCRIPT_DIR")"
+
+# Mirrors the frontend service in docker-compose.selfhost.yml. PORT belongs to
+# the backend there, so the frontend listens on FRONTEND_PORT. HOSTNAME is not
+# honoured because login shells commonly export it as the machine name.
+export NODE_ENV=production
+export PORT="${FRONTEND_PORT:-3000}"
+export HOSTNAME="${MULTICA_WEB_HOSTNAME:-127.0.0.1}"
+export REMOTE_API_URL="${REMOTE_API_URL:-http://127.0.0.1:${BACKEND_PORT:-${API_PORT:-${SERVER_PORT:-8080}}}}"
+
+# server.js changes into its own directory before starting
+exec "${PREFIX_DIR}/lib/multica-web/node" "${PREFIX_DIR}/share/multica-web/apps/web/server.js" "$@"

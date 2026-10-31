@@ -7,15 +7,10 @@ REPO_DIR="$(git -C "$(dirname -- "${BASH_SOURCE[0]}")" rev-parse --show-toplevel
 REPO="multica-ai/multica"
 WORK_DIR="${REPO_DIR}/multica-build-workspace"
 
-echo "==> Fetching the latest release tag from $REPO..."
-LATEST_TAG=$(curl -s "https://api.github.com/repos/$REPO/releases/latest" | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/')
+echo "==> Resolving the release tag from $REPO..."
+LATEST_TAG="$(bash "${REPO_DIR}/scripts/resolve-multica-tag.bash")"
 
-if [ -z "$LATEST_TAG" ]; then
-  echo "Error: Could not fetch the latest release tag." >&2
-  exit 1
-fi
-
-echo "==> Latest release found: $LATEST_TAG"
+echo "==> Using release: $LATEST_TAG"
 
 # Setup workspace
 mkdir -p "$WORK_DIR"
@@ -46,10 +41,23 @@ mkdir -p bin
 # -----------------------------------------------------------------------------
 echo "==> Building the Go backend server..."
 if command -v go &> /dev/null; then
+  # Mirrors Dockerfile: the same binaries and flags as the backend image
+  VERSION="$LATEST_TAG"
+  COMMIT="unknown"
+  DATE="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+  rm -rf bin/multica-server
+  mkdir -p bin/multica-server
   cd server
-  go build -o ../bin/multica-server ./cmd/server
+  CGO_ENABLED=0 go build -ldflags "-s -w -X main.version=${VERSION} -X main.commit=${COMMIT}" -o ../bin/multica-server/server ./cmd/server
+  CGO_ENABLED=0 go build -ldflags "-s -w -X main.version=${VERSION} -X main.commit=${COMMIT} -X main.date=${DATE}" -o ../bin/multica-server/multica ./cmd/multica
+  CGO_ENABLED=0 go build -ldflags "-s -w" -o ../bin/multica-server/migrate ./cmd/migrate
+  CGO_ENABLED=0 go build -ldflags "-s -w" -o ../bin/multica-server/maintenance ./cmd/maintenance
+  CGO_ENABLED=0 go build -ldflags "-s -w" -o ../bin/multica-server/backfill_task_usage_hourly ./cmd/backfill_task_usage_hourly
+  CGO_ENABLED=0 go build -ldflags "-s -w" -o ../bin/multica-server/backfill_codex_usage_cache ./cmd/backfill_codex_usage_cache
   cd ..
-  echo "SUCCESS: Server binary compiled at $(pwd)/bin/multica-server"
+  cp -r server/migrations bin/multica-server/migrations
+  cp LICENSE NOTICE bin/multica-server/
+  echo "SUCCESS: Server binaries compiled at $(pwd)/bin/multica-server"
 else
   echo "WARNING: 'go' is not installed. Skipping server build." >&2
 fi
@@ -67,33 +75,17 @@ if ! command -v pnpm &> /dev/null; then
 fi
 
 echo "==> Installing monorepo dependencies using pnpm..."
-pnpm install
+pnpm install --frozen-lockfile
 
 echo "==> Building the web app package (apps/web)..."
 # Standalone output bundles a minimal server.js with traced node_modules
-STANDALONE=true pnpm --filter web build
-
-# -----------------------------------------------------------------------------
-# 3. Assemble the dist folder
-# -----------------------------------------------------------------------------
-DIST_DIR="${REPO_DIR}/dist"
-WEB_DIST_DIR="${DIST_DIR}/share/multica-web/web"
-
-echo "==> Assembling dist folder at ${DIST_DIR}..."
-rm -rf "$DIST_DIR"
-mkdir -p "${DIST_DIR}/bin" "$WEB_DIST_DIR"
-
-cp bin/multica-server "${DIST_DIR}/bin/multica-server"
+NEXT_PUBLIC_APP_VERSION="$LATEST_TAG" STANDALONE=true pnpm --filter @multica/web build
 
 # Mirrors Dockerfile.web: standalone tree, plus static and public which
 # standalone output does not include
-cp -a apps/web/.next/standalone/. "$WEB_DIST_DIR/"
-mkdir -p "${WEB_DIST_DIR}/apps/web/.next"
-cp -a apps/web/.next/static "${WEB_DIST_DIR}/apps/web/.next/static"
-cp -a apps/web/public "${WEB_DIST_DIR}/apps/web/public"
-
-echo "-----------------------------------------------------------------------------"
-echo "Build procedure completed for Multica version: $LATEST_TAG"
-echo "Server Binary : ${DIST_DIR}/bin/multica-server"
-echo "Web App       : ${WEB_DIST_DIR} (run: node apps/web/server.js)"
-echo "-----------------------------------------------------------------------------"
+rm -rf bin/multica-web
+mkdir -p bin/multica-web/apps/web/.next
+cp -a apps/web/.next/standalone/. bin/multica-web/
+cp -a apps/web/.next/static bin/multica-web/apps/web/.next/static
+cp -a apps/web/public bin/multica-web/apps/web/public
+cp LICENSE NOTICE bin/multica-web/

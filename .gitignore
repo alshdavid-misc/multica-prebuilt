@@ -4,3 +4,4 @@ node_modules/
 multica-build-workspace/
 .pnpm-store/
 dist/
+multica-cli.tmp/
