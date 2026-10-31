@@ -9,9 +9,6 @@ rm -rf "${REPO_DIR}/node"
 rm -rf "${REPO_DIR}/multica-build-workspace"
 rm -rf "${REPO_DIR}/dist"
 
-apt-get update
-apt-get install -y --no-install-recommends ca-certificates curl git libatomic1
-
 bash "${REPO_DIR}/scripts/download-go.bash"
 export PATH="${REPO_DIR}/go/bin:$PATH"
 
@@ -28,6 +25,12 @@ go version
 
 which node
 node --version
+
+NEEDS_PUBLISH="$(bash "${REPO_DIR}/scripts/check-published.bash")"
+if [ "${NEEDS_PUBLISH}" = "false" ]; then
+  echo "Prebuilt release is already up to date with multica, skipping build"
+  exit 0
+fi
 
 LATEST_TAG="$(bash "${REPO_DIR}/scripts/resolve-multica-tag.bash")"
 LATEST_VERSION="${LATEST_TAG#v}"
@@ -58,7 +61,17 @@ cp "$(which node)" "${REPO_DIR}/dist/lib/multica-web"
 cp "${REPO_DIR}/bins/multica-server" "${REPO_DIR}/dist/bin/multica-server"
 cp "${REPO_DIR}/bins/multica-web" "${REPO_DIR}/dist/bin/multica-web"
 
-# rm -rf "${REPO_DIR}/go"
-# rm -rf "${REPO_DIR}/node"
-# rm -rf "${REPO_DIR}/.pnpm-store"
-# rm -rf "${REPO_DIR}/multica-build-workspace"
+rm -rf "${REPO_DIR}/go"
+rm -rf "${REPO_DIR}/node"
+rm -rf "${REPO_DIR}/.pnpm-store"
+rm -rf "${REPO_DIR}/multica-build-workspace"
+
+cd dist
+tar -czf "${REPO_DIR}/multica-linux-amd64.tar.gz" ./*
+cd ..
+
+gh release delete "$LATEST_TAG" --yes --cleanup-tag 2>/dev/null || true
+gh release create "$LATEST_TAG" --draft --notes "Generating"
+gh release edit "$LATEST_TAG" --title "$LATEST_TAG"
+gh release upload "$LATEST_TAG" "${REPO_DIR}/multica-linux-amd64.tar.gz"
+gh release edit "$LATEST_TAG" --draft=false
