@@ -70,10 +70,30 @@ echo "==> Installing monorepo dependencies using pnpm..."
 pnpm install
 
 echo "==> Building the web app package (apps/web)..."
-pnpm --filter web build
+# Standalone output bundles a minimal server.js with traced node_modules
+STANDALONE=true pnpm --filter web build
+
+# -----------------------------------------------------------------------------
+# 3. Assemble the dist folder
+# -----------------------------------------------------------------------------
+DIST_DIR="${REPO_DIR}/dist"
+WEB_DIST_DIR="${DIST_DIR}/share/multica-web/web"
+
+echo "==> Assembling dist folder at ${DIST_DIR}..."
+rm -rf "$DIST_DIR"
+mkdir -p "${DIST_DIR}/bin" "$WEB_DIST_DIR"
+
+cp bin/multica-server "${DIST_DIR}/bin/multica-server"
+
+# Mirrors Dockerfile.web: standalone tree, plus static and public which
+# standalone output does not include
+cp -a apps/web/.next/standalone/. "$WEB_DIST_DIR/"
+mkdir -p "${WEB_DIST_DIR}/apps/web/.next"
+cp -a apps/web/.next/static "${WEB_DIST_DIR}/apps/web/.next/static"
+cp -a apps/web/public "${WEB_DIST_DIR}/apps/web/public"
 
 echo "-----------------------------------------------------------------------------"
 echo "Build procedure completed for Multica version: $LATEST_TAG"
-echo "Server Binary : $(pwd)/bin/multica-server"
-echo "Web App Build : $(pwd)/apps/web/.next"
+echo "Server Binary : ${DIST_DIR}/bin/multica-server"
+echo "Web App       : ${WEB_DIST_DIR} (run: node apps/web/server.js)"
 echo "-----------------------------------------------------------------------------"

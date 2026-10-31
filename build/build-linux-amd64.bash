@@ -27,3 +27,4 @@ bash "${REPO_DIR}/scripts/build-multica.bash"
 
 rm -rf "${REPO_DIR}/go"
 rm -rf "${REPO_DIR}/node"
+rm -rf "${REPO_DIR}/multica-build-workspace"
